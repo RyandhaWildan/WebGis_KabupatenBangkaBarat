@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm --filter @workspace/webgis-bangka-barat run build",
+  "outputDirectory": "artifacts/webgis-bangka-barat/dist/public",
+  "framework": "vite"
+}

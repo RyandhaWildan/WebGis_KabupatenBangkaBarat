@@ -1,0 +1,41 @@
+Tolong rombak total tata letak (layout) WebGIS Bangka Barat saya agar menggunakan sistem "Multi-Tab Dashboard" dengan Top Navigation Bar seperti pada gambar referensi. 
+
+Ketika menu di Navbar Atas diklik, aplikasi harus menyembunyikan halaman lain dan hanya menampilkan konten halaman yang aktif secara dinamis (Single Page Application menggunakan JavaScript).
+
+Gunakan Tailwind CSS (Tema Dark Mode Premium: background abu-abu gelap/biru navy gelap, teks putih, aksen Emerald/Green untuk indikator aktif). Berikut adalah pembagian menu/halaman yang harus dibuat:
+
+1. [Navbar Atas] Struktur Menu Navigasi:
+   - Brand Title (Kiri): "Vegetation Change Analysis - Bangka Barat"
+   - Menu Tabs (Tengah): [Home] [Peta Hasil] [Data & Proses] [Evaluasi Model] [Insight Hasil] [About]
+
+2. [Tab Konten] Detail Komponen Setiap Halaman:
+
+   - 🏠 TAB 1: HOME
+     * Tampilan full-screen card/banner pembuka yang profesional.
+     * Judul: "Analisis Perubahan Vegetasi Kabupaten Bangka Barat Menggunakan Random Forest dan Sentinel-2 SR Harmonized".
+     * Tambahkan ringkasan singkat latar belakang proyek UAS, metodologi singkat, serta tombol "Mulai Eksplorasi Peta" yang mengarah ke Tab Peta Hasil.
+
+   - 🗺️ TAB 2: PETA HASIL (Tampilan Utama seperti Gambar Referensi)
+     * Layout dibagi menjadi 3 Kolom utama:
+       a. Kiri (Width 20-25%): "Control Sidebar" yang berisi toggle layer basemap (Dark Road / Satellite) dan fungsionalitas turn on/off untuk preprocessing layers (Batas Kabupaten, Citra Komposit 2024/2025, NDVI/NDMI, Raster Kelas, Training Sample, Hasil RF, dan Change Detection).
+       b. Tengah (Width 50-55%): Peta interaktif Leaflet.js yang responsif (full-height di dalam kolomnya).
+       c. Kanan (Width 20-25%): "Metrics Analysis" yang menyajikan statistik ringkas (Luas vegetasi 2024, Luas vegetasi 2025, Perubahan Bersih, Area Bertambah/Berkurang) dan section "Insight Cepat".
+
+   - 📊 TAB 3: DATA & PROSES
+     * Halaman khusus berisi tabel data atribut atau metadata preprocessing (Tabel rentang tanggal komposit citra, parameter cloud threshold <20%, resolusi spasial 10m, serta daftar band fitur penentu). Sediakan juga tombol dummy untuk mendownload dataset berupa SHP/GeoTIFF.
+
+   - 🎯 TAB 4: EVALUASI MODEL
+     * Halaman khusus untuk menampilkan performa Machine Learning Random Forest.
+     * Buat tampilan tabel visual untuk "Confusion Matrix" (Matrix Kesalahan), diikuti dengan komponen visual/progress bar untuk menampilkan nilai: Overall Accuracy (92.4%), Kappa Index (0.848), Precision (94.1%), Recall (91.3%), dan F1 Score.
+
+   - 💡 TAB 5: INSIGHT HASIL
+     * Halaman narasi spasial/infografis. Tampilkan analisis mengenai wilayah mana di Bangka Barat yang mengalami kehilangan (Loss) vegetasi paling parah (misal akibat tambang/pembukaan lahan) atau wilayah yang mengalami pertumbuhan (Gain) vegetasi yang masif.
+
+   - ℹ️ TAB 6: ABOUT
+     * Halaman profil pembuat aplikasi. Cantumkan Nama Mahasiswa, NIM, Mata Kuliah (Maha Data 2025/2026), Logo Kampus, dan deskripsi singkat platform ini.
+
+3. Ketentuan Teknis UI/UX:
+   - Saat tab berpindah, peta di Tab 2 tidak boleh rusak atau tidak merender komponen (*hint: gunakan fungsi map.invalidateSize() saat Tab Peta diaktifkan*).
+   - Berikan class transisi halus (transition-all duration-300) pada efek hover navbar dan perpindahan halaman agar aplikasi terkesan mahal dan interaktif.
+
+Tuliskan kode lengkap HTML, CSS, dan logika JavaScript barunya secara terstruktur.
