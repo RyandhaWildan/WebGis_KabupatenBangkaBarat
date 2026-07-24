@@ -82,19 +82,27 @@ function createOfflineBasemap(type: 'dark' | 'satellite'): L.TileLayer {
     opacity: 1,
   });
 }
+// ─── Mulberry32 seeded PRNG — same algorithm used in geodata.ts ──────────────
+// GEE seeds: 2024 samples = seed 123, 2025 samples = seed 456
+function mulberry32(a: number): () => number {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const sampleNodes: { lat: number; lng: number; v1: number; v2: number }[] = [];
 function initSampleNodes() {
-  let seed = 42;
-  function random() {
-    const x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
-  }
+  // seed 123 — sesuai GEE seed stratifiedSample tahun 2024
+  const rng = mulberry32(123);
   for (let i = 0; i < 45; i++) {
     sampleNodes.push({
-      lat: -2.05 + (random() * 0.45),
-      lng: 105.12 + (random() * 0.72),
-      v1: random(), // data 2024
-      v2: random()  // data 2025
+      lat: -2.05 + rng() * 0.45,
+      lng: 105.12 + rng() * 0.72,
+      v1: rng(), // representasi data 2024
+      v2: rng()  // representasi data 2025
     });
   }
 }
@@ -328,28 +336,46 @@ function pointInPolygon(lng: number, lat: number, ring: number[][]): boolean {
   return inside;
 }
 
-// Generate N sample points strictly inside a polygon ring using a seeded RNG
+// Generate N sample points strictly inside a polygon ring using a seeded RNG.
+// Seed sesuai GEE script UAS: 2024 → seed=123, 2025 → seed=456
 function generateSamplesInBoundary(
-  count: number, year: number, seedOffset: number, ring: number[][]
+  count: number, year: number, geeSeed: number, ring: number[][]
 ): { type: string; features: any[] } {
   const lngs = ring.map(c => c[0]);
   const lats = ring.map(c => c[1]);
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
 
-  let seed = 42 + seedOffset;
-  const rng = () => { const x = Math.sin(seed++) * 10000; return x - Math.floor(x); };
+  // Mulberry32 PRNG dengan seed GEE
+  const rng = mulberry32(geeSeed);
 
   const features: any[] = [];
   let attempts = 0;
-  while (features.length < count && attempts < count * 200) {
+  // Stratified: separuh vegetasi, separuh non-vegetasi (sesuai GEE stratifiedSample)
+  const halfCount = Math.floor(count / 2);
+  let vegCount = 0;
+  let nonVegCount = 0;
+
+  while (features.length < count && attempts < count * 300) {
     attempts++;
     const lng = minLng + rng() * (maxLng - minLng);
     const lat = minLat + rng() * (maxLat - minLat);
     if (pointInPolygon(lng, lat, ring)) {
+      // Assign class berdasarkan stratifikasi: 50% vegetasi, 50% non-vegetasi
+      const wantVeg = vegCount < halfCount;
+      const wantNonVeg = nonVegCount < halfCount;
+      let label: string;
+      if (wantVeg && wantNonVeg) {
+        label = rng() > 0.5 ? 'Vegetasi' : 'Non-Vegetasi';
+      } else if (wantVeg) {
+        label = 'Vegetasi';
+      } else {
+        label = 'Non-Vegetasi';
+      }
+      if (label === 'Vegetasi') vegCount++; else nonVegCount++;
       features.push({
         type: 'Feature',
-        properties: { class: rng() > 0.4 ? 'Vegetasi' : 'Non-Vegetasi', year },
+        properties: { class: label, year },
         geometry: { type: 'Point', coordinates: [lng, lat] }
       });
     }
@@ -714,8 +740,9 @@ export const MapContainer = forwardRef(function MapContainer(
         // ── Regenerate training sample points inside precise boundary ──────────
         // Uses ray-casting so every point is guaranteed within the actual
         // Bangka Barat polygon, not just the rectangular bounding box.
-        const fc2024 = generateSamplesInBoundary(75, 2024, 0, preciseCoords);
-        const fc2025 = generateSamplesInBoundary(75, 2025, 1000, preciseCoords);
+        // Seed sesuai GEE UAS: samples2024 seed=123, samples2025 seed=456
+        const fc2024 = generateSamplesInBoundary(150, 2024, 123, preciseCoords);
+        const fc2025 = generateSamplesInBoundary(150, 2025, 456, preciseCoords);
 
         (['samples2024', 'samples2025'] as const).forEach((id, i) => {
           const fc = i === 0 ? fc2024 : fc2025;

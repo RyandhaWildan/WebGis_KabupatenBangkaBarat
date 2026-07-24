@@ -50,10 +50,13 @@ const layerGroups = [
   },
 ];
 
+// Statistik hasil analisis GEE — Seed 2024: 123 | Seed 2025: 456
+// Periode: Juni–September | Threshold NDVI: 0.4 | RF: 100 pohon
+// Luas total Bangka Barat ≈ 286.000 Ha
 const metricCards = [
   { label: 'Luas Veg. 2024', value: '201.670 Ha', pct: '70.5%', color: '#34d399' },
   { label: 'Luas Veg. 2025', value: '195.400 Ha', pct: '68.3%', color: '#60a5fa' },
-  { label: 'Net Perubahan',  value: '−6.270 Ha',  pct: '−2.2%', color: '#f87171' },
+  { label: 'Net Perubahan',  value: '−6.270 Ha',  pct: '−3.1%', color: '#f87171' },
   { label: 'Gain Vegetasi',  value: '+12.150 Ha', pct: '4.2%',  color: '#34d399' },
   { label: 'Loss Vegetasi',  value: '−18.420 Ha', pct: '6.4%',  color: '#fbbf24' },
 ];

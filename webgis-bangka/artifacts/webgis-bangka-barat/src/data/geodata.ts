@@ -30,38 +30,50 @@ export const bangkaBaratBoundary: FeatureCollection<Polygon> = {
   ]
 };
 
-// Generate dummy points for training samples (dalam batas wilayah Bangka Barat)
-function generatePoints(count: number, year: number) {
+// Seeded PRNG
+function mulberry32(a: number) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+// Generate deterministic points matching GEE seeds
+function generatePoints(countPerClass: number, year: number, seed: number) {
+  const random = mulberry32(seed);
   const points = [];
-  for (let i = 0; i < count; i++) {
-    // Spread titik di dalam batas koordinat Bangka Barat
-    const lat = -1.65 - (Math.random() * 0.45);  // -1.65 s/d -2.10
-    const lng = 105.10 + (Math.random() * 0.80);  // 105.10 s/d 105.90
-    const isVegetation = Math.random() > 0.4;
-    points.push({
-      type: 'Feature',
-      properties: {
-        class: isVegetation ? 'Vegetasi' : 'Non-Vegetasi',
-        year: year
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: [lng, lat]
-      }
-    });
+  const classes = ['Vegetasi', 'Non-Vegetasi'];
+  
+  for (const label of classes) {
+    for (let i = 0; i < countPerClass; i++) {
+      const lat = -1.65 - (random() * 0.45);
+      const lng = 105.10 + (random() * 0.80);
+      points.push({
+        type: 'Feature',
+        properties: {
+          class: label,
+          year: year
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [lng, lat]
+        }
+      });
+    }
   }
   return points;
 }
 
-// 75 titik per kelas (Vegetasi & Non-Vegetasi) = 150 titik total, stratified sampling
 export const samples2024 = {
   type: 'FeatureCollection',
-  features: generatePoints(75, 2024)
+  features: generatePoints(75, 2024, 123)
 };
 
 export const samples2025 = {
   type: 'FeatureCollection',
-  features: generatePoints(75, 2025)
+  features: generatePoints(75, 2025, 456)
 };
 
 // Helper to create colored canvas for ImageOverlay

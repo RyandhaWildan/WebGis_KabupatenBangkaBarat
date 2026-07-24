@@ -12,7 +12,7 @@ const steps = [
   { text: 'Menghitung Indeks Spektral (NDVI & NDMI)...', duration: 800 },
   { text: 'Menyinkronkan batas wilayah administratif (batas_bangkabarat.shp)...', duration: 700 },
   { text: 'Mengekstrak 150 Ground Truth Training Samples...', duration: 800 },
-  { text: 'Melatih Classifier Random Forest (100 Trees, Seed 42)...', duration: 900 },
+  { text: 'Melatih Classifier Random Forest (100 Trees, Seed 123)...', duration: 900 },
   { text: 'Menjalankan Deteksi Perubahan Tutupan Lahan (2024 vs 2025)...', duration: 800 },
   { text: 'Merender peta interaktif dan overlay spasial...', duration: 600 },
   { text: 'Analisis selesai! Membuka Dasbor...', duration: 400 },

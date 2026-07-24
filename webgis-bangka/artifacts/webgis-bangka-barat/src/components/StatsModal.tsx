@@ -9,9 +9,10 @@ interface StatsModalProps {
 }
 
 // Total = 286,230 Ha (Bangka Barat)
+// Seed 2024: 123 | Seed 2025: 456 | RF: 100 pohon | NDVI threshold: 0.4
 const changeData = [
   { name: 'Tetap Vegetasi', value: 183250, percentage: 64.0, color: '#22c55e' },
-  { name: 'Tetap Non-Veg',  value: 72410,  percentage: 25.3, color: '#eab308' },
+  { name: 'Tetap Non-Veg',  value: 72310,  percentage: 25.3, color: '#eab308' },
   { name: 'Loss Vegetasi',  value: 18420,  percentage: 6.4,  color: '#ef4444' },
   { name: 'Gain Vegetasi',  value: 12150,  percentage: 4.2,  color: '#3b82f6' },
 ];
@@ -195,7 +196,7 @@ export function StatsModal({ open, onOpenChange }: StatsModalProps) {
                 </table>
                 <div className="mt-4 pt-3 border-t border-border flex justify-between items-center text-sm font-semibold">
                   <span>Net Change</span>
-                  <span className="text-red-400 font-mono bg-red-400/10 px-2 py-1 rounded">-6,270 Ha (-2.2%)</span>
+                  <span className="text-red-400 font-mono bg-red-400/10 px-2 py-1 rounded">-6,270 Ha (-3.1%)</span>
                 </div>
               </div>
             </div>

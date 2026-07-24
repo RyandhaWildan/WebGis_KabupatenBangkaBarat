@@ -93,7 +93,7 @@ const flowchartSteps = [
     details: [
       { key: 'Jumlah Trees', value: '100 Decision Trees' },
       { key: 'Variabel Fitur', value: '6 Band Spektral + 2 Indeks Spektral' },
-      { key: 'Seed Reproduksibilitas', value: 'Seed 42' }
+      { key: 'Seed Reproduksibilitas', value: 'Seed 123 (2024) / 456 (2025)' }
     ]
   },
   {
@@ -544,7 +544,7 @@ export function TabData() {
                   { label:'Algoritma Classifier', value:'Random Forest (RF)', desc:'Ensambel Pohon Keputusan', color:'#a78bfa' },
                   { label:'Jumlah Trees (Pohon)', value:'100 Trees', desc:'Jumlah estimators pohon keputusan', color:'#34d399' },
                   { label:'Rasio Split Data', value:'70% : 30%', desc:'Train / Test Partition Ratio', color:'#60a5fa' },
-                  { label:'Seed Random State', value:'42', desc:'Reproduksibilitas keacakan model', color:'#fb923c' },
+                  { label:'Seed Random State', value:'123 / 456', desc:'Seed 123 (RF+Sample 2024), 456 (Sample 2025)', color:'#fb923c' },
                 ].map(s => (
                   <div key={s.label} style={{
                     padding:'10px 12px', borderRadius:12,

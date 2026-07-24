@@ -1,0 +1,1621 @@
+/************************************************************
+ UAS MAHA DATA 2025/2026
+ Analisis Perubahan Vegetasi Kabupaten Bangka Barat
+ Menggunakan Random Forest dan Sentinel-2 SR Harmonized
+
+ Nama Kota      : Bangka Barat
+ Objek Target   : Vegetasi
+ Dataset        : Sentinel-2 Surface Reflectance Harmonized
+ Boundary Asset : projects/gee-nazwaputri/assets/batas_bangkabarat
+
+ OUTPUT PREPROCESSING
+ ✓ Composite Tahun 2024
+ ✓ Composite Tahun 2025
+ ✓ Cloud Masking
+ ✓ Clip Boundary
+ ✓ Feature Stack
+ ✓ NDVI
+ ✓ NDMI
+ ✓ Raster Kelas
+ ✓ Training Sample
+************************************************************/
+
+
+
+//==========================================================
+// 1. MEMANGGIL BATAS WILAYAH PENELITIAN
+//==========================================================
+
+var boundary = ee.FeatureCollection(
+'projects/gee-nazwaputri/assets/batas_bangkabarat'
+);
+
+Map.centerObject(boundary,10);
+
+Map.addLayer(
+boundary,
+{color:'red'},
+'Batas Bangka Barat'
+);
+
+
+
+//==========================================================
+// 2. PARAMETER PENELITIAN
+//==========================================================
+
+var start2024 = '2024-06-01';
+var end2024   = '2024-09-30';
+
+var start2025 = '2025-06-01';
+var end2025   = '2025-09-30';
+
+// Maksimum cloud pada scene Sentinel-2
+var cloudThreshold = 20;
+
+
+
+//==========================================================
+// 3. MEMANGGIL DATASET SENTINEL-2
+//==========================================================
+
+var S2 = ee.ImageCollection(
+'COPERNICUS/S2_SR_HARMONIZED'
+);
+
+
+
+//==========================================================
+// 4. FUNGSI CLOUD MASKING
+//==========================================================
+
+function maskS2Clouds(image){
+
+  var qa = image.select('QA60');
+
+  var cloudBitMask = 1 << 10;
+  var cirrusBitMask = 1 << 11;
+
+  var mask =
+      qa.bitwiseAnd(cloudBitMask).eq(0)
+      .and(
+      qa.bitwiseAnd(cirrusBitMask).eq(0)
+      );
+
+  return image
+      .updateMask(mask)
+      .divide(10000)
+      .copyProperties(
+        image,
+        ['system:time_start']
+      );
+
+}
+
+
+
+//==========================================================
+// 5. MEMBUAT CITRA KOMPOSIT
+//==========================================================
+
+function createComposite(startDate,endDate){
+
+  var collection = S2
+      .filterBounds(boundary)
+      .filterDate(startDate,endDate)
+      .filter(
+        ee.Filter.lt(
+          'CLOUDY_PIXEL_PERCENTAGE',
+          cloudThreshold
+        )
+      )
+      .map(maskS2Clouds);
+
+  print(
+  'Jumlah citra ' + startDate,
+  collection.size()
+  );
+
+  var composite = collection
+      .median()
+      .clip(boundary);
+
+  return composite;
+
+}
+
+
+
+//==========================================================
+// 6. MEMBUAT KOMPOSIT TAHUN 2024 DAN 2025
+//==========================================================
+
+var composite2024 =
+createComposite(
+start2024,
+end2024
+);
+
+var composite2025 =
+createComposite(
+start2025,
+end2025
+);
+
+
+
+//==========================================================
+// 7. VISUALISASI KOMPOSIT RGB
+//==========================================================
+
+var rgbVis = {
+
+bands:['B4','B3','B2'],
+
+min:0,
+
+max:0.3
+
+};
+
+Map.addLayer(
+composite2024,
+rgbVis,
+'RGB 2024'
+);
+
+Map.addLayer(
+composite2025,
+rgbVis,
+'RGB 2025'
+);
+
+
+
+//==========================================================
+// 8. FUNGSI PERHITUNGAN NDVI
+//==========================================================
+
+function addNDVI(image){
+
+  var ndvi = image
+      .normalizedDifference(
+      ['B8','B4']
+      )
+      .rename('NDVI');
+
+  return image.addBands(ndvi);
+
+}
+
+
+
+//==========================================================
+// 9. FUNGSI PERHITUNGAN NDMI
+//==========================================================
+
+function addNDMI(image){
+
+  var ndmi = image
+      .normalizedDifference(
+      ['B8','B11']
+      )
+      .rename('NDMI');
+
+  return image.addBands(ndmi);
+
+}
+
+
+
+//==========================================================
+// 10. MENAMBAHKAN NDVI DAN NDMI KE CITRA
+//==========================================================
+
+var image2024 =
+addNDMI(
+addNDVI(composite2024)
+);
+
+var image2025 =
+addNDMI(
+addNDVI(composite2025)
+);
+
+
+//==========================================================
+// 11. MEMBUAT FEATURE STACK
+//==========================================================
+
+// Band yang digunakan sebagai feature
+var bandsToSelect = [
+'B2',
+'B3',
+'B4',
+'B8',
+'B11',
+'B12',
+'NDVI',
+'NDMI'
+];
+
+// Feature Stack Tahun 2024
+var featureStack2024 =
+image2024.select(bandsToSelect);
+
+// Feature Stack Tahun 2025
+var featureStack2025 =
+image2025.select(bandsToSelect);
+
+
+
+//==========================================================
+// 12. CEK STRUKTUR FEATURE STACK
+//==========================================================
+
+print(
+'Band Feature 2024',
+featureStack2024.bandNames()
+);
+
+print(
+'Band Feature 2025',
+featureStack2025.bandNames()
+);
+
+
+
+//==========================================================
+// 13. VISUALISASI NDVI
+//==========================================================
+
+var ndviVis = {
+
+min:-0.2,
+
+max:0.8,
+
+palette:[
+'white',
+'yellow',
+'green',
+'darkgreen'
+]
+
+};
+
+Map.addLayer(
+featureStack2024.select('NDVI'),
+ndviVis,
+'NDVI 2024'
+);
+
+Map.addLayer(
+featureStack2025.select('NDVI'),
+ndviVis,
+'NDVI 2025'
+);
+
+
+
+//==========================================================
+// 14. MENGHITUNG LUAS WILAYAH PENELITIAN
+//==========================================================
+
+var areaKm2 =
+boundary.geometry()
+.area()
+.divide(1000000);
+
+print(
+'Luas Bangka Barat (km²)',
+areaKm2
+);
+
+
+
+//==========================================================
+// 15. EXPORT FEATURE STACK TAHUN 2024
+//==========================================================
+
+Export.image.toDrive({
+
+image:featureStack2024,
+
+description:'FeatureStack_Vegetasi_BangkaBarat_2024',
+
+folder:'UAS_Mahadata',
+
+fileNamePrefix:'FeatureStack2024',
+
+region:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+
+
+//==========================================================
+// 16. EXPORT FEATURE STACK TAHUN 2025
+//==========================================================
+
+Export.image.toDrive({
+
+image:featureStack2025,
+
+description:'FeatureStack_Vegetasi_BangkaBarat_2025',
+
+folder:'UAS_Mahadata',
+
+fileNamePrefix:'FeatureStack2025',
+
+region:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+
+
+//==========================================================
+// 17. MENAMPILKAN PARAMETER PREPROCESSING
+//==========================================================
+
+print('========== PARAMETER PREPROCESSING ==========');
+
+print('Wilayah : Bangka Barat');
+
+print('Objek : Vegetasi');
+
+print('Dataset : COPERNICUS/S2_SR_HARMONIZED');
+
+print(
+'Periode 2024 : ',
+start2024,
+' sampai ',
+end2024
+);
+
+print(
+'Periode 2025 : ',
+start2025,
+' sampai ',
+end2025
+);
+
+print(
+'Cloud Threshold : ',
+cloudThreshold
+);
+
+print(
+'Composite : Median'
+);
+
+print(
+'Resolusi : 10 meter'
+);
+
+print(
+'Feature : B2,B3,B4,B8,B11,B12,NDVI,NDMI'
+);
+
+
+
+//==========================================================
+// 18. MEMBUAT RASTER KELAS BERDASARKAN NDVI
+//==========================================================
+
+// Threshold Vegetasi
+var threshold = 0.4;
+
+
+// Raster Tahun 2024
+
+var classImage2024 =
+featureStack2024
+.select('NDVI')
+.gte(threshold)
+.rename('class');
+
+Map.addLayer(
+
+classImage2024,
+
+{
+
+min:0,
+
+max:1,
+
+palette:[
+'red',
+'green'
+]
+
+},
+
+'Class Raster 2024'
+
+);
+
+
+// Raster Tahun 2025
+
+var classImage2025 =
+featureStack2025
+.select('NDVI')
+.gte(threshold)
+.rename('class');
+
+Map.addLayer(
+
+classImage2025,
+
+{
+
+min:0,
+
+max:1,
+
+palette:[
+'red',
+'green'
+]
+
+},
+
+'Class Raster 2025'
+
+);
+
+
+
+//==========================================================
+// 19. PERSIAPAN DATA TRAINING 2024
+//==========================================================
+
+// Menggabungkan Feature Stack
+// dengan Raster Kelas
+
+var trainingImage2024 =
+featureStack2024
+.addBands(classImage2024);
+
+
+
+//==========================================================
+// 20. PERSIAPAN DATA TRAINING 2025
+//==========================================================
+
+// Menggabungkan Feature Stack
+// dengan Raster Kelas
+
+var trainingImage2025 =
+featureStack2025
+.addBands(classImage2025);
+
+
+//==========================================================
+// 21. STRATIFIED RANDOM SAMPLE TAHUN 2024
+//     seed: 123
+//==========================================================
+
+// Membuat sample 75 titik per kelas
+
+var samples2024 =
+trainingImage2024.stratifiedSample({
+
+  numPoints:75,
+
+  classBand:'class',
+
+  region:boundary.geometry(),
+
+  scale:10,
+
+  seed:123,
+
+  geometries:true
+
+});
+
+print(
+'Semua Sample 2024',
+samples2024
+);
+
+
+// Memisahkan kelas Vegetasi
+
+var vegetasi2024 =
+samples2024.filter(
+ee.Filter.eq('class',1)
+);
+
+
+// Memisahkan kelas Non Vegetasi
+
+var nonVegetasi2024 =
+samples2024.filter(
+ee.Filter.eq('class',0)
+);
+
+
+// Menampilkan sample Vegetasi
+
+Map.addLayer(
+
+vegetasi2024,
+
+{color:'00FF00'},
+
+'Vegetasi 75 Titik 2024'
+
+);
+
+
+// Menampilkan sample Non Vegetasi
+
+Map.addLayer(
+
+nonVegetasi2024,
+
+{color:'FF0000'},
+
+'Non Vegetasi 75 Titik 2024'
+
+);
+
+
+
+//==========================================================
+// 22. STRATIFIED RANDOM SAMPLE TAHUN 2025
+//     seed: 456
+//==========================================================
+
+// Membuat sample 75 titik per kelas
+
+var samples2025 =
+trainingImage2025.stratifiedSample({
+
+  numPoints:75,
+
+  classBand:'class',
+
+  region:boundary.geometry(),
+
+  scale:10,
+
+  seed:456,
+
+  geometries:true
+
+});
+
+print(
+'Semua Sample 2025',
+samples2025
+);
+
+
+// Memisahkan kelas Vegetasi
+
+var vegetasi2025 =
+samples2025.filter(
+ee.Filter.eq('class',1)
+);
+
+
+// Memisahkan kelas Non Vegetasi
+
+var nonVegetasi2025 =
+samples2025.filter(
+ee.Filter.eq('class',0)
+);
+
+
+// Menampilkan sample Vegetasi
+
+Map.addLayer(
+
+vegetasi2025,
+
+{color:'005500'},
+
+'Vegetasi 75 Titik 2025'
+
+);
+
+
+// Menampilkan sample Non Vegetasi
+
+Map.addLayer(
+
+nonVegetasi2025,
+
+{color:'880000'},
+
+'Non Vegetasi 75 Titik 2025'
+
+);
+
+
+
+//==========================================================
+// 23. EXPORT TRAINING SAMPLE
+//==========================================================
+
+// Export Sample Tahun 2024
+
+Export.table.toDrive({
+
+collection:samples2024,
+
+description:'TrainingSample_BangkaBarat_2024',
+
+folder:'UAS_Mahadata',
+
+fileFormat:'SHP'
+
+});
+
+
+// Export Sample Tahun 2025
+
+Export.table.toDrive({
+
+collection:samples2025,
+
+description:'TrainingSample_BangkaBarat_2025',
+
+folder:'UAS_Mahadata',
+
+fileFormat:'SHP'
+
+});
+
+
+
+//==========================================================
+// 24. MEMBAGI DATA MENJADI TRAINING DAN TESTING
+//     seed: 123 (sama dengan GEE seed 2024)
+//==========================================================
+
+// Menggunakan sample tahun 2024
+// sebagai data pelatihan model
+
+var seed = 123;
+
+
+// Membuat nilai acak
+
+var randomSample =
+samples2024.randomColumn(
+'random',
+seed
+);
+
+
+// 70% Training
+
+var training =
+randomSample.filter(
+
+ee.Filter.lt(
+'random',
+0.7
+)
+
+);
+
+
+// 30% Testing
+
+var testing =
+randomSample.filter(
+
+ee.Filter.gte(
+'random',
+0.7
+)
+
+);
+
+
+print(
+'Jumlah Training',
+training.size()
+);
+
+print(
+'Jumlah Testing',
+testing.size()
+);
+
+
+//==========================================================
+// 25. MENENTUKAN BAND INPUT RANDOM FOREST
+//==========================================================
+
+// NDVI tidak digunakan karena dipakai
+// sebagai label class
+
+var bands = [
+
+'B2',
+'B3',
+'B4',
+'B8',
+'B11',
+'B12',
+'NDMI'
+
+];
+
+
+
+//==========================================================
+// 26. MEMBUAT MODEL RANDOM FOREST
+//     numberOfTrees: 100, seed: 123
+//==========================================================
+
+var classifier =
+ee.Classifier.smileRandomForest({
+
+numberOfTrees:100,
+
+seed:seed
+
+});
+
+
+
+//==========================================================
+// 27. MELATIH MODEL RANDOM FOREST
+//==========================================================
+
+// Mengambil nilai band
+// pada titik training
+
+var trainingData =
+featureStack2024
+.select(bands)
+.sampleRegions({
+
+collection:training,
+
+properties:['class'],
+
+scale:10
+
+});
+
+
+// Melatih model
+
+var trainedClassifier =
+classifier.train({
+
+features:trainingData,
+
+classProperty:'class',
+
+inputProperties:bands
+
+});
+
+print(
+'Random Forest Model',
+trainedClassifier
+);
+
+
+
+//==========================================================
+// 28. KLASIFIKASI TAHUN 2024
+//==========================================================
+
+var classified2024 =
+featureStack2024
+.select(bands)
+.classify(trainedClassifier);
+
+Map.addLayer(
+
+classified2024,
+
+{
+
+min:0,
+max:1,
+
+palette:[
+'red',
+'green'
+]
+
+},
+
+'Random Forest 2024'
+
+);
+
+
+
+//==========================================================
+// 29. KLASIFIKASI TAHUN 2025
+//==========================================================
+
+var classified2025 =
+featureStack2025
+.select(bands)
+.classify(trainedClassifier);
+
+Map.addLayer(
+
+classified2025,
+
+{
+
+min:0,
+max:1,
+
+palette:[
+'red',
+'green'
+]
+
+},
+
+'Random Forest 2025'
+
+);
+
+
+
+//==========================================================
+// 30. EVALUASI MODEL
+//==========================================================
+
+// Mengambil data testing
+
+var testingData =
+featureStack2024
+.select(bands)
+.sampleRegions({
+
+  collection:testing,
+
+  properties:['class'],
+
+  scale:10
+
+});
+
+
+// Melakukan prediksi pada data testing
+
+var testingClassification =
+testingData.classify(
+trainedClassifier
+);
+
+
+// Membuat Confusion Matrix
+
+var confusionMatrix =
+testingClassification.errorMatrix(
+'class',
+'classification'
+);
+
+
+// Menampilkan hasil evaluasi
+
+print(
+'========== HASIL EVALUASI =========='
+);
+
+print(
+'Jumlah Data Testing',
+testing.size()
+);
+
+print(
+'Confusion Matrix',
+confusionMatrix
+);
+
+print(
+'Overall Accuracy',
+confusionMatrix.accuracy()
+);
+
+print(
+'Kappa',
+confusionMatrix.kappa()
+);
+
+print(
+'Producer Accuracy',
+confusionMatrix.producersAccuracy()
+);
+
+print(
+'User Accuracy',
+confusionMatrix.consumersAccuracy()
+);
+
+
+
+//==========================================================
+// 31. MENGHITUNG PRECISION, RECALL DAN F1 SCORE
+//==========================================================
+
+// Mengambil Confusion Matrix sebagai Array
+
+var cm =
+confusionMatrix.array();
+
+
+// True Positive, False Positive, False Negative
+
+var TP =
+ee.Number(cm.get([1,1]));
+
+var FP =
+ee.Number(cm.get([0,1]));
+
+var FN =
+ee.Number(cm.get([1,0]));
+
+
+// Precision kelas target (Vegetasi = 1)
+
+var precision =
+TP.divide(
+TP.add(FP)
+);
+
+
+// Recall kelas target (Vegetasi = 1)
+
+var recall =
+TP.divide(
+TP.add(FN)
+);
+
+
+// F1 Score
+
+var f1 =
+precision
+.multiply(recall)
+.multiply(2)
+.divide(
+precision.add(recall)
+);
+
+
+// Menampilkan hasil
+
+print(
+'Precision',
+precision
+);
+
+print(
+'Recall',
+recall
+);
+
+print(
+'F1 Score',
+f1
+);
+
+
+//==========================================================
+// INTERPRETASI MODEL
+//==========================================================
+
+print(
+'========== INTERPRETASI MODEL =========='
+);
+
+
+// True Positive
+var TP = ee.Number(cm.get([1,1]));
+
+// False Positive
+var FP = ee.Number(cm.get([0,1]));
+
+// False Negative
+var FN = ee.Number(cm.get([1,0]));
+
+// True Negative
+var TN = ee.Number(cm.get([0,0]));
+
+print('True Positive (TP)', TP);
+print('False Positive (FP)', FP);
+print('False Negative (FN)', FN);
+print('True Negative (TN)', TN);
+
+
+print(
+'Interpretasi',
+'Model Random Forest memiliki performa yang baik berdasarkan nilai Accuracy, Precision, Recall, dan F1 Score. False Positive menunjukkan piksel non vegetasi yang diprediksi sebagai vegetasi, sedangkan False Negative menunjukkan piksel vegetasi yang diprediksi sebagai non vegetasi. Semakin kecil nilai FP dan FN maka model semakin baik dan layak digunakan untuk analisis perubahan vegetasi.'
+);
+
+print(
+'Keterbatasan Model',
+'Ground truth dibuat menggunakan threshold NDVI sehingga masih memiliki ketidakpastian. Resolusi spasial Sentinel-2 sebesar 10 meter juga dapat menghasilkan mixed pixel terutama pada batas vegetasi, lahan terbuka, dan area terbangun.'
+);
+
+
+
+//==========================================================
+// 32. EXPORT HASIL KLASIFIKASI
+//==========================================================
+
+Export.image.toDrive({
+
+image:classified2024,
+
+description:'RF_BangkaBarat_2024',
+
+folder:'UAS_Mahadata',
+
+fileNamePrefix:'RandomForest2024',
+
+region:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+Export.image.toDrive({
+
+image:classified2025,
+
+description:'RF_BangkaBarat_2025',
+
+folder:'UAS_Mahadata',
+
+fileNamePrefix:'RandomForest2025',
+
+region:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+
+//==========================================================
+// 33. INFORMASI RANDOM FOREST
+//==========================================================
+
+print('========== PARAMETER RANDOM FOREST ==========');
+
+print('Algoritma : Random Forest');
+
+print('Jumlah Pohon : ',100);
+
+print('Jumlah Band : ',bands.length);
+
+print('Band : ',bands);
+
+print('Training : ',training.size());
+
+print('Testing : ',testing.size());
+
+print('Seed (2024 Sample) : 123');
+
+print('Seed (2025 Sample) : 456');
+
+print('Seed (RF Model)    : 123');
+
+
+//==========================================================
+// 34. HITUNG LUAS VEGETASI 2024 DAN 2025
+//==========================================================
+
+// Menghitung luas piksel (hektar)
+var pixelArea = ee.Image.pixelArea().divide(10000);
+
+// Luas vegetasi 2024
+var areaVegetasi2024 = pixelArea.updateMask(classified2024.eq(1));
+
+var luasVegetasi2024 = areaVegetasi2024.reduceRegion({
+
+  reducer: ee.Reducer.sum(),
+
+  geometry: boundary,
+
+  scale: 10,
+
+  maxPixels: 1e13
+
+});
+
+// Luas vegetasi 2025
+var areaVegetasi2025 = pixelArea.updateMask(classified2025.eq(1));
+
+var luasVegetasi2025 = areaVegetasi2025.reduceRegion({
+
+  reducer: ee.Reducer.sum(),
+
+  geometry: boundary,
+
+  scale: 10,
+
+  maxPixels: 1e13
+
+});
+
+print(
+'Luas Vegetasi 2024 (Ha)',
+ee.Number(luasVegetasi2024.get('area'))
+);
+
+print(
+'Luas Vegetasi 2025 (Ha)',
+ee.Number(luasVegetasi2025.get('area'))
+);
+
+
+//==========================================================
+// 35. MENGHITUNG PERSENTASE VEGETASI
+//==========================================================
+
+var luasWilayahHa =
+boundary.geometry().area().divide(10000);
+
+var persen2024 =
+ee.Number(luasVegetasi2024.get('area'))
+.divide(luasWilayahHa)
+.multiply(100);
+
+var persen2025 =
+ee.Number(luasVegetasi2025.get('area'))
+.divide(luasWilayahHa)
+.multiply(100);
+
+print('Persentase Vegetasi 2024 (%)', persen2024);
+
+print('Persentase Vegetasi 2025 (%)', persen2025);
+
+print(
+'Interpretasi Persentase',
+'Persentase vegetasi dihitung terhadap luas total wilayah Kabupaten Bangka Barat sehingga dapat dibandingkan antara tahun 2024 dan tahun 2025.'
+);
+
+
+//==========================================================
+// 36. CHANGE DETECTION
+//==========================================================
+
+// Kode Perubahan
+// 0 = Tetap Non Vegetasi (0 → 0)
+// 1 = Gain Vegetasi      (0 → 1)
+// 2 = Loss Vegetasi      (1 → 0)
+// 3 = Tetap Vegetasi     (1 → 1)
+
+var changeMap =
+classified2024.multiply(2)
+.add(classified2025);
+
+Map.addLayer(
+
+changeMap,
+
+{
+
+min:0,
+
+max:3,
+
+palette:[
+
+'red',      // Tetap Non Vegetasi
+'blue',     // Gain
+'yellow',   // Loss
+'green'     // Tetap Vegetasi
+
+]
+
+},
+
+'Change Detection'
+
+);
+
+print('========== CHANGE DETECTION ==========');
+
+print('0 = Tetap Non Vegetasi');
+print('1 = Gain Vegetasi');
+print('2 = Loss Vegetasi');
+print('3 = Tetap Vegetasi');
+
+
+//==========================================================
+// 37. GAIN VEGETASI
+//==========================================================
+
+// Vegetasi baru pada tahun 2025
+
+var gain =
+classified2024.eq(0)
+.and(
+classified2025.eq(1)
+);
+
+Map.addLayer(
+
+gain.selfMask(),
+
+{
+
+palette:['0000FF']
+
+},
+
+'Gain Vegetasi'
+
+);
+
+
+//==========================================================
+// 38. LOSS VEGETASI
+//==========================================================
+
+// Vegetasi yang hilang pada tahun 2025
+
+var loss =
+classified2024.eq(1)
+.and(
+classified2025.eq(0)
+);
+
+Map.addLayer(
+
+loss.selfMask(),
+
+{
+
+palette:['FFFF00']
+
+},
+
+'Loss Vegetasi'
+
+);
+
+
+//==========================================================
+// 39. STABLE VEGETASI
+//==========================================================
+
+// Vegetasi yang tetap pada kedua tahun
+
+var stableVegetasi =
+classified2024.eq(1)
+.and(
+classified2025.eq(1)
+);
+
+Map.addLayer(
+
+stableVegetasi.selfMask(),
+
+{
+
+palette:['00FF00']
+
+},
+
+'Stable Vegetasi'
+
+);
+
+
+//==========================================================
+// 40. STABLE NON VEGETASI
+//==========================================================
+
+// Non vegetasi yang tetap pada kedua tahun
+
+var stableNonVegetasi =
+classified2024.eq(0)
+.and(
+classified2025.eq(0)
+);
+
+Map.addLayer(
+
+stableNonVegetasi.selfMask(),
+
+{
+
+palette:['FF0000']
+
+},
+
+'Stable Non Vegetasi'
+
+);
+
+
+//==========================================================
+// 41. NET CHANGE DAN PERSENTASE PERUBAHAN
+//==========================================================
+
+// Net Change = Luas Vegetasi 2025 - Luas Vegetasi 2024
+
+var netChange =
+ee.Number(
+luasVegetasi2025.get('area')
+)
+.subtract(
+ee.Number(
+luasVegetasi2024.get('area')
+)
+);
+
+print(
+'Net Change (Ha)',
+netChange
+);
+
+// Persentase perubahan terhadap luas vegetasi tahun 2024
+
+var persenPerubahan =
+netChange
+.divide(
+ee.Number(
+luasVegetasi2024.get('area')
+)
+)
+.multiply(100);
+
+print(
+'Persentase Perubahan (%)',
+persenPerubahan
+);
+
+// Interpretasi sederhana
+
+print(
+'Interpretasi Net Change',
+'Nilai positif menunjukkan vegetasi bertambah, sedangkan nilai negatif menunjukkan vegetasi berkurang dibanding tahun 2024.'
+);
+
+
+//==========================================================
+// 42. STATISTIK PERUBAHAN
+//==========================================================
+
+// Menghitung luas setiap kelas perubahan
+
+var statistik =
+pixelArea
+.addBands(changeMap)
+.reduceRegion({
+
+reducer:
+ee.Reducer.sum().group({
+
+groupField:1,
+
+groupName:'kelas'
+
+}),
+
+geometry:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+print(
+'========== STATISTIK CHANGE DETECTION =========='
+);
+
+print(
+'Statistik Perubahan',
+statistik
+);
+
+// Membaca isi statistik
+
+var groups =
+ee.List(
+statistik.get('groups')
+);
+
+print(
+'========== DETAIL CHANGE DETECTION =========='
+);
+
+print(groups);
+
+// Menampilkan nama setiap kelas perubahan
+groups.evaluate(function(result){
+
+  result.forEach(function(item){
+
+    if(item.kelas === 0){
+      print('Tetap Non Vegetasi (Ha)', item.sum);
+    }
+
+    if(item.kelas === 1){
+      print('Gain Vegetasi (Ha)', item.sum);
+    }
+
+    if(item.kelas === 2){
+      print('Loss Vegetasi (Ha)', item.sum);
+    }
+
+    if(item.kelas === 3){
+      print('Tetap Vegetasi (Ha)', item.sum);
+    }
+
+  });
+
+});
+
+
+//==========================================================
+// 43. LUAS GAIN, LOSS, STABLE VEGETASI DAN NON VEGETASI
+//==========================================================
+
+// Gain Vegetasi
+
+var luasGain =
+pixelArea
+.updateMask(gain)
+.reduceRegion({
+
+reducer:ee.Reducer.sum(),
+
+geometry:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+// Loss Vegetasi
+
+var luasLoss =
+pixelArea
+.updateMask(loss)
+.reduceRegion({
+
+reducer:ee.Reducer.sum(),
+
+geometry:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+// Stable Vegetasi
+
+var luasStableVegetasi =
+pixelArea
+.updateMask(stableVegetasi)
+.reduceRegion({
+
+reducer:ee.Reducer.sum(),
+
+geometry:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+// Stable Non Vegetasi
+
+var luasStableNonVegetasi =
+pixelArea
+.updateMask(stableNonVegetasi)
+.reduceRegion({
+
+reducer:ee.Reducer.sum(),
+
+geometry:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
+
+print(
+'========== LUAS PERUBAHAN VEGETASI =========='
+);
+
+print(
+'Luas Gain Vegetasi (Ha)',
+ee.Number(luasGain.get('area'))
+);
+
+print(
+'Luas Loss Vegetasi (Ha)',
+ee.Number(luasLoss.get('area'))
+);
+
+print(
+'Luas Stable Vegetasi (Ha)',
+ee.Number(luasStableVegetasi.get('area'))
+);
+
+print(
+'Luas Stable Non Vegetasi (Ha)',
+ee.Number(luasStableNonVegetasi.get('area'))
+);
+
+
+//==========================================================
+// 44. INTERPRETASI CHANGE DETECTION DAN EXPORT
+//==========================================================
+
+print(
+'========== INTERPRETASI PERUBAHAN =========='
+);
+
+print(
+'Interpretasi',
+'Area berwarna biru menunjukkan penambahan (Gain) vegetasi, area kuning menunjukkan kehilangan (Loss) vegetasi, area hijau menunjukkan vegetasi yang tetap, sedangkan area merah menunjukkan non vegetasi yang tetap.'
+);
+
+print(
+'Lokasi Perubahan Terbesar',
+'Lokasi perubahan terbesar dapat diidentifikasi secara visual pada layer Change Detection berdasarkan sebaran area Gain (biru) dan Loss (kuning).'
+);
+
+print(
+'Kesimpulan',
+'Perubahan bersih vegetasi diperoleh dari selisih luas vegetasi tahun 2025 terhadap tahun 2024. Nilai negatif menunjukkan penurunan luas vegetasi, sedangkan nilai positif menunjukkan peningkatan luas vegetasi.'
+);
+
+
+//==========================================================
+// EXPORT CHANGE DETECTION
+//==========================================================
+
+Export.image.toDrive({
+
+image:changeMap,
+
+description:'ChangeDetection_BangkaBarat',
+
+folder:'UAS_Mahadata',
+
+fileNamePrefix:'ChangeDetection',
+
+region:boundary.geometry(),
+
+scale:10,
+
+maxPixels:1e13
+
+});
